@@ -1,0 +1,493 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>날씨 비교 — 어제 실적 vs 오늘 예보</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #ffffff;
+      --bg2: #f4f4f2;
+      --bg3: #eeecea;
+      --text: #1a1a18;
+      --text2: #6b6b67;
+      --border: rgba(0,0,0,0.1);
+      --info-bg: #e6f1fb;
+      --info-text: #185fa5;
+      --danger-bg: #fcebeb;
+      --danger-text: #a32d2d;
+      --radius-md: 8px;
+      --radius-lg: 12px;
+    }
+
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg: #1e1e1c;
+        --bg2: #2a2a28;
+        --bg3: #343430;
+        --text: #f0f0ec;
+        --text2: #9a9a94;
+        --border: rgba(255,255,255,0.1);
+        --info-bg: #0c447c;
+        --info-text: #b5d4f4;
+        --danger-bg: #791f1f;
+        --danger-text: #f7c1c1;
+      }
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: var(--bg3);
+      color: var(--text);
+      min-height: 100vh;
+      padding: 16px;
+    }
+
+    .card {
+      background: var(--bg);
+      border-radius: var(--radius-lg);
+      border: 0.5px solid var(--border);
+      padding: 20px 20px 24px;
+      max-width: 860px;
+      margin: 0 auto;
+    }
+
+    .header {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 12px;
+      margin-bottom: 20px;
+    }
+
+    .header h1 {
+      font-size: 18px;
+      font-weight: 500;
+      color: var(--text);
+      margin-bottom: 4px;
+    }
+
+    .subtitle {
+      font-size: 13px;
+      color: var(--text2);
+    }
+
+    .btn-group {
+      display: flex;
+      gap: 6px;
+      flex-wrap: wrap;
+    }
+
+    .btn {
+      font-size: 13px;
+      padding: 6px 14px;
+      border-radius: var(--radius-md);
+      border: 0.5px solid var(--border);
+      background: transparent;
+      color: var(--text2);
+      cursor: pointer;
+      transition: background 0.15s, color 0.15s;
+    }
+
+    .btn:hover { background: var(--bg2); }
+
+    .btn.active {
+      background: var(--info-bg);
+      color: var(--info-text);
+      border-color: var(--info-text);
+    }
+
+    .metric-cards {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 10px;
+      margin-bottom: 20px;
+    }
+
+    @media (max-width: 500px) {
+      .metric-cards { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    }
+
+    .metric-card {
+      background: var(--bg2);
+      border-radius: var(--radius-md);
+      padding: 12px;
+    }
+
+    .metric-card .label {
+      font-size: 12px;
+      color: var(--text2);
+      margin-bottom: 4px;
+    }
+
+    .metric-card .value {
+      font-size: 22px;
+      font-weight: 500;
+      color: var(--text);
+    }
+
+    .legend {
+      display: flex;
+      gap: 18px;
+      margin-bottom: 10px;
+      font-size: 12px;
+      color: var(--text2);
+      flex-wrap: wrap;
+    }
+
+    .legend-item {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .legend-line {
+      width: 24px;
+      height: 2px;
+      background: #3266ad;
+      border-radius: 2px;
+    }
+
+    .legend-line.dashed {
+      background: none;
+      border-top: 2.5px dashed #e07b39;
+    }
+
+    .legend-line.nowline {
+      background: none;
+      border-top: 2px dashed #999;
+    }
+
+    .chart-wrap {
+      position: relative;
+      width: 100%;
+      height: 300px;
+    }
+
+    @media (max-width: 500px) {
+      .chart-wrap { height: 240px; }
+    }
+
+    .error-box {
+      display: none;
+      margin-top: 14px;
+      padding: 12px;
+      background: var(--danger-bg);
+      border-radius: var(--radius-md);
+      color: var(--danger-text);
+      font-size: 13px;
+    }
+
+    .location-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 20px;
+      flex-wrap: wrap;
+    }
+
+    .location-row label {
+      font-size: 13px;
+      color: var(--text2);
+    }
+
+    .location-row input, .location-row select {
+      font-size: 13px;
+      padding: 6px 10px;
+      border-radius: var(--radius-md);
+      border: 0.5px solid var(--border);
+      background: var(--bg2);
+      color: var(--text);
+      outline: none;
+    }
+
+    .location-row button {
+      font-size: 13px;
+      padding: 6px 14px;
+      border-radius: var(--radius-md);
+      border: 0.5px solid var(--border);
+      background: transparent;
+      color: var(--text);
+      cursor: pointer;
+    }
+
+    .location-row button:hover { background: var(--bg2); }
+
+    .spinner {
+      display: inline-block;
+      width: 14px; height: 14px;
+      border: 2px solid var(--border);
+      border-top-color: var(--info-text);
+      border-radius: 50%;
+      animation: spin 0.7s linear infinite;
+      vertical-align: middle;
+      margin-left: 6px;
+    }
+
+    @keyframes spin { to { transform: rotate(360deg); } }
+  </style>
+</head>
+<body>
+
+<div class="card">
+
+  <div class="header">
+    <div>
+      <h1>날씨 비교 — 어제 실적 vs 오늘 예보</h1>
+      <p class="subtitle" id="subtitle">데이터 로딩 중...<span class="spinner" id="spinner"></span></p>
+    </div>
+    <div class="btn-group">
+      <button class="btn active" id="btn-temperature" onclick="setMetric('temperature')">🌡 기온</button>
+      <button class="btn" id="btn-precipitation" onclick="setMetric('precipitation')">🌧 강수량</button>
+      <button class="btn" id="btn-windspeed" onclick="setMetric('windspeed')">💨 풍속</button>
+      <button class="btn" id="btn-humidity" onclick="setMetric('humidity')">💧 습도</button>
+    </div>
+  </div>
+
+  <!-- 위치 설정 -->
+  <div class="location-row">
+    <label>위치</label>
+    <select id="preset" onchange="applyPreset()">
+      <option value="37.5665,126.978,서울">서울</option>
+      <option value="35.1796,129.0756,부산">부산</option>
+      <option value="37.4563,126.7052,인천">인천</option>
+      <option value="35.8714,128.6014,대구">대구</option>
+      <option value="35.9078,127.7669,전주">전주</option>
+      <option value="33.4996,126.5312,제주">제주</option>
+      <option value="custom">직접 입력</option>
+    </select>
+    <input type="number" id="lat" placeholder="위도" value="37.5665" step="0.0001" style="width:100px;" />
+    <input type="number" id="lon" placeholder="경도" value="126.978" step="0.0001" style="width:100px;" />
+    <button onclick="load()">조회</button>
+  </div>
+
+  <!-- 요약 카드 -->
+  <div class="metric-cards">
+    <div class="metric-card">
+      <p class="label">어제 최고 기온</p>
+      <p class="value" id="card-ymax">—</p>
+    </div>
+    <div class="metric-card">
+      <p class="label">오늘 최고 예보</p>
+      <p class="value" id="card-tmax">—</p>
+    </div>
+    <div class="metric-card">
+      <p class="label">어제 총 강수량</p>
+      <p class="value" id="card-yprecip">—</p>
+    </div>
+    <div class="metric-card">
+      <p class="label">현재 시각</p>
+      <p class="value" id="card-now">—</p>
+    </div>
+  </div>
+
+  <!-- 범례 -->
+  <div class="legend">
+    <div class="legend-item"><span class="legend-line"></span>어제 실적</div>
+    <div class="legend-item"><span class="legend-line dashed"></span>오늘 예보</div>
+    <div class="legend-item"><span class="legend-line nowline"></span>현재 시각</div>
+  </div>
+
+  <!-- 차트 -->
+  <div class="chart-wrap">
+    <canvas id="weatherChart"></canvas>
+  </div>
+
+  <div class="error-box" id="error-box"></div>
+
+</div>
+
+<script>
+  const LABELS = Array.from({length: 24}, (_, i) => i + ':00');
+  let yData = {}, tData = {}, chart = null, currentMetric = 'temperature';
+
+  const METRICS = {
+    temperature:  { key: 'temperature_2m',      unit: '°C',   yLabel: '기온 (°C)'   },
+    precipitation:{ key: 'precipitation',        unit: 'mm',   yLabel: '강수량 (mm)' },
+    windspeed:    { key: 'windspeed_10m',         unit: 'km/h', yLabel: '풍속 (km/h)' },
+    humidity:     { key: 'relativehumidity_2m',   unit: '%',    yLabel: '습도 (%)'    },
+  };
+
+  const today = new Date();
+  const yest  = new Date(today); yest.setDate(yest.getDate() - 1);
+  const fmt   = d => d.toISOString().slice(0, 10);
+  const nowH  = today.getHours();
+
+  function applyPreset() {
+    const v = document.getElementById('preset').value;
+    if (v === 'custom') return;
+    const [lat, lon] = v.split(',');
+    document.getElementById('lat').value = lat;
+    document.getElementById('lon').value = lon;
+    load();
+  }
+
+  async function load() {
+    const lat = parseFloat(document.getElementById('lat').value);
+    const lon = parseFloat(document.getElementById('lon').value);
+    if (isNaN(lat) || isNaN(lon)) { showError('위도/경도를 올바르게 입력해 주세요.'); return; }
+
+    document.getElementById('subtitle').innerHTML = '데이터 로딩 중...<span class="spinner"></span>';
+    document.getElementById('error-box').style.display = 'none';
+
+    const vars = 'temperature_2m,precipitation,windspeed_10m,relativehumidity_2m';
+    const base = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&hourly=${vars}&timezone=Asia%2FSeoul`;
+
+    try {
+      const [yRes, tRes] = await Promise.all([
+        fetch(`${base}&start_date=${fmt(yest)}&end_date=${fmt(yest)}`),
+        fetch(`${base}&start_date=${fmt(today)}&end_date=${fmt(today)}`),
+      ]);
+      if (!yRes.ok || !tRes.ok) throw new Error('API 응답 오류');
+      const yJson = await yRes.json(), tJson = await tRes.json();
+      yData = yJson.hourly;
+      tData = tJson.hourly;
+
+      const yTemps  = yData.temperature_2m;
+      const tTemps  = tData.temperature_2m;
+      const yPrecip = yData.precipitation;
+
+      document.getElementById('card-ymax').textContent    = Math.max(...yTemps).toFixed(1) + '°C';
+      document.getElementById('card-tmax').textContent    = Math.max(...tTemps).toFixed(1) + '°C';
+      document.getElementById('card-yprecip').textContent = yPrecip.reduce((a,b) => a+b, 0).toFixed(1) + 'mm';
+      document.getElementById('card-now').textContent     = String(nowH).padStart(2,'0') + ':00';
+
+      const loc = document.getElementById('preset');
+      const locName = loc.value !== 'custom' ? loc.options[loc.selectedIndex].text : `${lat.toFixed(2)}, ${lon.toFixed(2)}`;
+      const m1 = yest.getMonth()+1, d1 = yest.getDate();
+      const m2 = today.getMonth()+1, d2 = today.getDate();
+      document.getElementById('subtitle').textContent = `${locName} · 어제(${m1}/${d1}) 실측 vs 오늘(${m2}/${d2}) 예보`;
+
+      buildChart();
+    } catch(e) {
+      showError('날씨 데이터를 불러오지 못했습니다: ' + e.message);
+      document.getElementById('subtitle').textContent = '데이터 로드 실패';
+    }
+  }
+
+  function buildChart() {
+    const mc = METRICS[currentMetric];
+    const yArr = yData[mc.key] || [];
+    const tArr = tData[mc.key] || [];
+    const isPrecip = currentMetric === 'precipitation';
+
+    const isDark = matchMedia('(prefers-color-scheme: dark)').matches;
+    const gridColor = isDark ? 'rgba(255,255,255,0.07)' : 'rgba(0,0,0,0.06)';
+    const tickColor = isDark ? 'rgba(255,255,255,0.5)'  : 'rgba(0,0,0,0.45)';
+
+    const datasets = isPrecip ? [
+      { label:'어제 실적', data:yArr, type:'bar',
+        backgroundColor:'rgba(50,102,173,0.45)', borderColor:'#3266ad', borderWidth:1, borderRadius:2 },
+      { label:'오늘 예보', data:tArr, type:'bar',
+        backgroundColor:'rgba(224,123,57,0.45)', borderColor:'#e07b39', borderWidth:1, borderRadius:2 },
+    ] : [
+      { label:'어제 실적', data:yArr,
+        borderColor:'#3266ad', backgroundColor:'rgba(50,102,173,0.07)',
+        borderWidth:2, pointRadius:2, pointHoverRadius:5, tension:0.3, fill:false },
+      { label:'오늘 예보', data:tArr,
+        borderColor:'#e07b39', backgroundColor:'rgba(224,123,57,0.07)',
+        borderWidth:2, borderDash:[5,4], pointRadius:2, pointHoverRadius:5, tension:0.3, fill:false },
+    ];
+
+    if (chart) chart.destroy();
+    chart = new Chart(document.getElementById('weatherChart'), {
+      type: isPrecip ? 'bar' : 'line',
+      data: { labels: LABELS, datasets },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        interaction: { mode:'index', intersect:false },
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            callbacks: {
+              title: ctx => ctx[0].label + ' 기준',
+              label: ctx => ` ${ctx.dataset.label}: ${ctx.parsed.y !== null ? ctx.parsed.y.toFixed(1)+mc.unit : '—'}`
+            }
+          },
+          annotation: {
+            annotations: {
+              nowLine: {
+                type: 'line',
+                xMin: nowH - 0.5, xMax: nowH - 0.5,
+                borderColor: 'rgba(130,130,130,0.55)',
+                borderWidth: 1.5,
+                borderDash: [4, 4],
+                label: {
+                  content: '현재',
+                  display: true,
+                  position: 'start',
+                  font: { size: 11 },
+                  color: tickColor,
+                  backgroundColor: 'transparent',
+                }
+              }
+            }
+          }
+        },
+        scales: {
+          x: {
+            grid: { color: gridColor },
+            ticks: { color: tickColor, font: { size: 11 }, maxRotation: 0, autoSkip: true, maxTicksLimit: 13 }
+          },
+          y: {
+            grid: { color: gridColor },
+            ticks: { color: tickColor, font: { size: 11 }, callback: v => v.toFixed(0) + mc.unit },
+            title: { display: true, text: mc.yLabel, color: tickColor, font: { size: 11 } }
+          }
+        }
+      }
+    });
+  }
+
+  function setMetric(m) {
+    currentMetric = m;
+    Object.keys(METRICS).forEach(k => {
+      const btn = document.getElementById('btn-' + k);
+      btn.classList.toggle('active', k === m);
+    });
+    if (Object.keys(yData).length) buildChart();
+  }
+
+  function showError(msg) {
+    const el = document.getElementById('error-box');
+    el.textContent = msg;
+    el.style.display = 'block';
+  }
+
+  // Chart.js annotation 플러그인 (현재 시각 선)
+  const annotationPlugin = {
+    id: 'annotation',
+    afterDraw(chart) {
+      const ann = chart.options.plugins.annotation?.annotations?.nowLine;
+      if (!ann) return;
+      const xScale = chart.scales.x;
+      if (!xScale) return;
+      const x = xScale.getPixelForValue(ann.xMin);
+      const ctx = chart.ctx;
+      const {top, bottom} = chart.chartArea;
+      ctx.save();
+      ctx.strokeStyle = ann.borderColor;
+      ctx.lineWidth   = ann.borderWidth;
+      ctx.setLineDash(ann.borderDash);
+      ctx.beginPath(); ctx.moveTo(x, top); ctx.lineTo(x, bottom); ctx.stroke();
+      if (ann.label?.display) {
+        ctx.fillStyle = ann.label.color || '#888';
+        ctx.font = `${ann.label.font?.size||11}px sans-serif`;
+        ctx.fillText(ann.label.content, x + 4, top + 14);
+      }
+      ctx.restore();
+    }
+  };
+  Chart.register(annotationPlugin);
+
+  // 초기 로드
+  document.getElementById('card-now').textContent = String(nowH).padStart(2,'0') + ':00';
+  load();
+</script>
+</body>
+</html>
