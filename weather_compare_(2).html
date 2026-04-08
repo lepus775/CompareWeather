@@ -3,406 +3,257 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>날씨 비교 — 어제 실적 vs 오늘 예보</title>
+  <title>날씨 비교 — 어제 vs 오늘 (실측/예보 하이브리드)</title>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-
     :root {
-      --bg: #ffffff;
-      --bg2: #f4f4f2;
-      --bg3: #eeecea;
-      --text: #1a1a18;
-      --text2: #6b6b67;
-      --border: rgba(0,0,0,0.1);
-      --info-bg: #e6f1fb;
-      --info-text: #185fa5;
-      --danger-bg: #fcebeb;
-      --danger-text: #a32d2d;
-      --radius-md: 8px;
-      --radius-lg: 12px;
+      --bg: #ffffff; --bg2: #f4f4f2; --bg3: #eeecea;
+      --text: #1a1a18; --text2: #6b6b67; --border: rgba(0,0,0,0.1);
+      --info-bg: #e6f1fb; --info-text: #185fa5;
+      --danger-bg: #fcebeb; --danger-text: #a32d2d;
+      --radius-md: 8px; --radius-lg: 12px;
     }
-
     @media (prefers-color-scheme: dark) {
       :root {
-        --bg: #1e1e1c;
-        --bg2: #2a2a28;
-        --bg3: #343430;
-        --text: #f0f0ec;
-        --text2: #9a9a94;
-        --border: rgba(255,255,255,0.1);
-        --info-bg: #0c447c;
-        --info-text: #b5d4f4;
-        --danger-bg: #791f1f;
-        --danger-text: #f7c1c1;
+        --bg: #1e1e1c; --bg2: #2a2a28; --bg3: #343430;
+        --text: #f0f0ec; --text2: #9a9a94; --border: rgba(255,255,255,0.1);
+        --info-bg: #0c447c; --info-text: #b5d4f4;
+        --danger-bg: #791f1f; --danger-text: #f7c1c1;
       }
     }
-
-    body {
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-      background: var(--bg3);
-      color: var(--text);
-      min-height: 100vh;
-      padding: 16px;
-    }
-
-    .card {
-      background: var(--bg);
-      border-radius: var(--radius-lg);
-      border: 0.5px solid var(--border);
-      padding: 20px 20px 24px;
-      max-width: 860px;
-      margin: 0 auto;
-    }
-
-    .header {
-      display: flex;
-      align-items: flex-start;
-      justify-content: space-between;
-      flex-wrap: wrap;
-      gap: 12px;
-      margin-bottom: 20px;
-    }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: var(--bg3); color: var(--text); min-height: 100vh; padding: 16px; }
+    .card { background: var(--bg); border-radius: var(--radius-lg); border: 0.5px solid var(--border); padding: 20px 20px 24px; max-width: 860px; margin: 0 auto; }
+    .header { display: flex; align-items: flex-start; justify-content: space-between; flex-wrap: wrap; gap: 12px; margin-bottom: 20px; }
     .header h1 { font-size: 18px; font-weight: 500; margin-bottom: 4px; }
-    .subtitle   { font-size: 13px; color: var(--text2); min-height: 18px; }
-
+    .subtitle { font-size: 13px; color: var(--text2); min-height: 18px; }
     .btn-group { display: flex; gap: 6px; flex-wrap: wrap; }
-    .btn {
-      font-size: 13px; padding: 6px 14px;
-      border-radius: var(--radius-md);
-      border: 0.5px solid var(--border);
-      background: transparent; color: var(--text2); cursor: pointer;
-      transition: background 0.15s;
-    }
-    .btn:hover  { background: var(--bg2); }
+    .btn { font-size: 13px; padding: 6px 14px; border-radius: var(--radius-md); border: 0.5px solid var(--border); background: transparent; color: var(--text2); cursor: pointer; transition: background 0.15s; }
     .btn.active { background: var(--info-bg); color: var(--info-text); border-color: var(--info-text); }
-
-    .metric-cards {
-      display: grid;
-      grid-template-columns: repeat(4, minmax(0, 1fr));
-      gap: 10px;
-      margin-bottom: 20px;
-    }
+    .metric-cards { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; margin-bottom: 20px; }
     @media (max-width: 500px) { .metric-cards { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
-
     .metric-card { background: var(--bg2); border-radius: var(--radius-md); padding: 12px; }
-    .metric-card .label { font-size: 12px; color: var(--text2); margin-bottom: 4px; }
-    .metric-card .value { font-size: 22px; font-weight: 500; }
-
-    .legend { display: flex; gap: 18px; margin-bottom: 10px; font-size: 12px; color: var(--text2); flex-wrap: wrap; }
+    .metric-card .label { font-size: 11px; color: var(--text2); margin-bottom: 4px; }
+    .metric-card .value { font-size: 20px; font-weight: 500; }
+    .legend { display: flex; gap: 18px; margin-bottom: 10px; font-size: 11px; color: var(--text2); flex-wrap: wrap; }
     .legend-item { display: flex; align-items: center; gap: 6px; }
-    .leg-solid  { width: 24px; height: 2.5px; background: #3266ad; border-radius: 2px; }
-    .leg-dashed { width: 24px; height: 0; border-top: 2.5px dashed #e07b39; }
-    .leg-now    { width: 24px; height: 0; border-top: 2px dashed #999; }
-
-    .chart-wrap { position: relative; width: 100%; height: 300px; }
-    @media (max-width: 500px) { .chart-wrap { height: 240px; } }
-
-    .location-row {
-      display: flex; align-items: center; gap: 8px;
-      flex-wrap: wrap; margin-bottom: 20px;
-    }
-    .location-row label { font-size: 13px; color: var(--text2); }
-    .location-row select {
-      font-size: 13px; padding: 6px 10px;
-      border-radius: var(--radius-md);
-      border: 0.5px solid var(--border);
-      background: var(--bg2); color: var(--text); outline: none;
-    }
-    .location-row button {
-      font-size: 13px; padding: 6px 14px;
-      border-radius: var(--radius-md);
-      border: 0.5px solid var(--border);
-      background: transparent; color: var(--text); cursor: pointer;
-    }
-    .location-row button:hover { background: var(--bg2); }
-
-    .error-box {
-      display: none; margin-top: 14px; padding: 12px;
-      background: var(--danger-bg); border-radius: var(--radius-md);
-      color: var(--danger-text); font-size: 13px;
-    }
-
-    .source-badge {
-      display: inline-block;
-      font-size: 11px; padding: 3px 8px;
-      border-radius: var(--radius-md);
-      background: var(--bg2); color: var(--text2);
-      border: 0.5px solid var(--border);
-      margin-left: 8px; vertical-align: middle;
-    }
-
-    .spinner {
-      display: inline-block; width: 13px; height: 13px;
-      border: 2px solid var(--border); border-top-color: var(--info-text);
-      border-radius: 50%; animation: spin 0.7s linear infinite;
-      vertical-align: middle; margin-left: 6px;
-    }
+    .leg-yest { width: 20px; height: 2px; background: #3266ad; }
+    .leg-today-past { width: 20px; height: 3px; background: #e07b39; }
+    .leg-today-future { width: 20px; height: 0; border-top: 3px dashed #e07b39; }
+    .chart-wrap { position: relative; width: 100%; height: 320px; }
+    .location-row { display: flex; align-items: center; gap: 8px; margin-bottom: 20px; }
+    .location-row select { font-size: 13px; padding: 6px 12px; border-radius: var(--radius-md); background: var(--bg2); color: var(--text); border: 0.5px solid var(--border); outline: none; }
+    .error-box { display: none; margin-top: 14px; padding: 12px; background: var(--danger-bg); border-radius: var(--radius-md); color: var(--danger-text); font-size: 13px; }
+    .spinner { display: inline-block; width: 12px; height: 12px; border: 2px solid var(--border); border-top-color: var(--info-text); border-radius: 50%; animation: spin 0.7s linear infinite; vertical-align: middle; margin-left: 6px; }
     @keyframes spin { to { transform: rotate(360deg); } }
   </style>
 </head>
 <body>
 <div class="card">
-
   <div class="header">
     <div>
-      <h1>날씨 비교 — 어제 실적 vs 오늘 예보 <span class="source-badge">기상청</span></h1>
-      <p class="subtitle" id="subtitle">데이터 로딩 중… <span class="spinner"></span></p>
+      <h1>날씨 비교 대시보드</h1>
+      <p class="subtitle" id="subtitle">데이터를 불러오는 중입니다… <span class="spinner"></span></p>
     </div>
     <div class="btn-group">
-      <button class="btn active" id="btn-temperature"   onclick="setMetric('temperature')">🌡 기온</button>
-      <button class="btn"        id="btn-precipitation" onclick="setMetric('precipitation')">🌧 강수량</button>
-      <button class="btn"        id="btn-windspeed"     onclick="setMetric('windspeed')">💨 풍속</button>
-      <button class="btn"        id="btn-humidity"      onclick="setMetric('humidity')">💧 습도</button>
+      <button class="btn active" id="btn-temperature" onclick="setMetric('temperature')">🌡 기온</button>
+      <button class="btn" id="btn-precipitation" onclick="setMetric('precipitation')">🌧 강수</button>
+      <button class="btn" id="btn-windspeed" onclick="setMetric('windspeed')">💨 풍속</button>
+      <button class="btn" id="btn-humidity" onclick="setMetric('humidity')">💧 습도</button>
     </div>
   </div>
 
   <div class="location-row">
-    <label>위치</label>
     <select id="preset" onchange="load()">
       <option value="60,127,서울">서울</option>
+      <option value="102,84,울산">울산</option>
       <option value="98,76,부산">부산</option>
       <option value="55,124,인천">인천</option>
       <option value="89,90,대구">대구</option>
-      <option value="63,89,전주">전주</option>
       <option value="52,38,제주">제주</option>
-      <option value="102,84,울산">울산</option>
     </select>
-    <button onclick="load()">조회</button>
+    <button class="btn" onclick="load()" style="background: var(--bg2);">조회/새로고침</button>
   </div>
 
   <div class="metric-cards">
-    <div class="metric-card"><p class="label">어제 최고 기온</p><p class="value" id="card-ymax">—</p></div>
-    <div class="metric-card"><p class="label">오늘 최고 예보</p><p class="value" id="card-tmax">—</p></div>
-    <div class="metric-card"><p class="label">어제 총 강수량</p><p class="value" id="card-yprecip">—</p></div>
-    <div class="metric-card"><p class="label">현재 시각</p>    <p class="value" id="card-now">—</p></div>
+    <div class="metric-card"><p class="label">어제 최고</p><p class="value" id="card-ymax">—</p></div>
+    <div class="metric-card"><p class="label">오늘 최고(예보)</p><p class="value" id="card-tmax">—</p></div>
+    <div class="metric-card"><p class="label">현재 시각</p><p class="value" id="card-now">—</p></div>
+    <div class="metric-card"><p class="label">업데이트 상태</p><p class="value" id="card-status" style="font-size:14px">대기 중</p></div>
   </div>
 
   <div class="legend">
-    <div class="legend-item"><span class="leg-solid"></span>어제 실적</div>
-    <div class="legend-item"><span class="leg-dashed"></span>오늘 예보</div>
-    <div class="legend-item"><span class="leg-now"></span>현재 시각</div>
+    <div class="legend-item"><span class="leg-yest"></span> 어제 실측</div>
+    <div class="legend-item"><span class="leg-today-past"></span> 오늘 실측 (지나감)</div>
+    <div class="legend-item"><span class="leg-today-future"></span> 오늘 예보 (남음)</div>
   </div>
 
   <div class="chart-wrap"><canvas id="weatherChart"></canvas></div>
   <div class="error-box" id="error-box"></div>
-
 </div>
-<script>
-/* ── 설정 ─────────────────────────────────────────── */
-const KMA_KEY  = '49197eae3f409cebe5a5f80e98b02f9049640217e1511666c3a8a1229f8fd9ca';
-const KMA_URL  = 'https://apis.data.go.kr/1360000/VilageFcstInfoService_2.0/getVilageFcst';
 
-const LABELS   = Array.from({length: 24}, (_, i) => i + ':00');
-const METRICS  = {
-  temperature:   { unit: '°C',   yLabel: '기온 (°C)'   },
-  precipitation: { unit: 'mm',   yLabel: '강수량 (mm)' },
-  windspeed:     { unit: 'm/s',  yLabel: '풍속 (m/s)'  },
-  humidity:      { unit: '%',    yLabel: '습도 (%)'    },
+<script>
+/* ── 환경 설정 ─────────────────────────────────── */
+const KMA_KEY = '49197eae3f409cebe5a5f80e98b02f9049640217e1511666c3a8a1229f8fd9ca';
+const BASE_URL = 'https://apis.data.go.kr/1360000/VilageFcstInfoService_2.0';
+const LABELS = Array.from({length: 24}, (_, i) => i + ':00');
+const METRICS = {
+  temperature: { unit: '°C', yLabel: '기온 (°C)' },
+  precipitation: { unit: 'mm', yLabel: '강수량 (mm)' },
+  windspeed: { unit: 'm/s', yLabel: '풍속 (m/s)' },
+  humidity: { unit: '%', yLabel: '습도 (%)' }
 };
 
-/* ── 날짜 헬퍼 ───────────────────────────────────── */
-const now   = new Date();
-const nowH  = now.getHours();
+let chart = null, currentMetric = 'temperature';
+let yDataAll = {}, tDataAll = {};
+const now = new Date();
+const nowH = now.getHours();
 
-function toKMADate(d) {
-  return d.getFullYear()
-    + String(d.getMonth()+1).padStart(2,'0')
-    + String(d.getDate()).padStart(2,'0');
+/* ── 유틸리티 함수 ─────────────────────────────── */
+function getKMAFormattedDate(date) {
+  return date.getFullYear() + String(date.getMonth()+1).padStart(2,'0') + String(date.getDate()).padStart(2,'0');
 }
 
-function dateOffset(base, days) {
-  const d = new Date(base);
-  d.setDate(d.getDate() + days);
-  return d;
-}
-
-const todayDate  = toKMADate(now);
-const yestDate   = toKMADate(dateOffset(now, -1));
-const dbYDate    = toKMADate(dateOffset(now, -2));   // 그제
-
-/* ── KMA API 호출 ────────────────────────────────── */
-async function fetchKMA(nx, ny, baseDate, baseTime) {
-  const url = `${KMA_URL}?serviceKey=${KMA_KEY}`
-    + `&numOfRows=1000&pageNo=1&dataType=JSON`
-    + `&base_date=${baseDate}&base_time=${baseTime}`
-    + `&nx=${nx}&ny=${ny}`;
-  const res = await fetch(url);
-  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+async function fetchKMA(endpoint, params) {
+  const query = new URLSearchParams({
+    serviceKey: KMA_KEY, dataType: 'JSON', numOfRows: 1000, pageNo: 1, ...params
+  });
+  const res = await fetch(`${BASE_URL}/${endpoint}?${query.toString()}`);
+  if (!res.ok) throw new Error("네트워크 응답이 없습니다.");
   const json = await res.json();
-  const rc = json?.response?.header?.resultCode;
-  if (rc && rc !== '00') throw new Error(`기상청 오류 코드: ${rc}`);
-  return json.response.body.items.item || [];
+  const resultCode = json.response?.header?.resultCode;
+  if (resultCode && resultCode !== '00') throw new Error(`API 오류: ${resultCode}`);
+  return json.response?.body?.items?.item || [];
 }
 
-/* ── 강수량 파싱 ─────────────────────────────────── */
 function parsePCP(val) {
   if (!val || val === '강수없음') return 0;
-  if (val.includes('미만'))       return 0.4;
+  if (val.includes('미만')) return 0.1;
   const m = val.match(/[\d.]+/);
   return m ? parseFloat(m[0]) : 0;
 }
 
-/* ── items → 24시간 배열 변환 ──────────────────── */
 function parseItems(items, targetDate) {
-  const slots = {};
-  for (let h = 0; h < 24; h++) {
-    const t = String(h).padStart(2,'0') + '00';
-    slots[t] = { TMP: null, PCP: 0, WSD: null, REH: null };
-  }
-
-  for (const item of items) {
-    if (item.fcstDate !== targetDate) continue;
-    const t = item.fcstTime;   // "0300" 형식
-    if (!slots[t]) continue;
-    switch (item.category) {
-      case 'TMP': slots[t].TMP = parseFloat(item.fcstValue); break;
-      case 'PCP': slots[t].PCP = parsePCP(item.fcstValue);   break;
-      case 'WSD': slots[t].WSD = parseFloat(item.fcstValue); break;
-      case 'REH': slots[t].REH = parseFloat(item.fcstValue); break;
-    }
-  }
-
-  const out = { temperature: [], precipitation: [], windspeed: [], humidity: [] };
-  for (let h = 0; h < 24; h++) {
-    const t = String(h).padStart(2,'0') + '00';
-    out.temperature.push(slots[t].TMP);
-    out.precipitation.push(slots[t].PCP);
-    out.windspeed.push(slots[t].WSD);
-    out.humidity.push(slots[t].REH);
-  }
-  return out;
+  const res = { temperature: Array(24).fill(null), precipitation: Array(24).fill(0), windspeed: Array(24).fill(null), humidity: Array(24).fill(null) };
+  items.forEach(item => {
+    if (item.fcstDate !== targetDate) return;
+    const h = parseInt(item.fcstTime.substring(0,2));
+    if (item.category === 'TMP') res.temperature[h] = parseFloat(item.fcstValue);
+    if (item.category === 'PCP') res.precipitation[h] = parsePCP(item.fcstValue);
+    if (item.category === 'WSD') res.windspeed[h] = parseFloat(item.fcstValue);
+    if (item.category === 'REH') res.humidity[h] = parseFloat(item.fcstValue);
+  });
+  return res;
 }
 
-/* ── 상태 ───────────────────────────────────────── */
-let yArr_all = {}, tArr_all = {}, chart = null, currentMetric = 'temperature';
-
-/* ── 데이터 로드 ─────────────────────────────────── */
+/* ── 데이터 로드 및 처리 ─────────────────────────── */
 async function load() {
-  const sel   = document.getElementById('preset');
-  const parts = sel.value.split(',');
-  const nx = parts[0], ny = parts[1], locName = parts[2];
-
-  document.getElementById('subtitle').innerHTML = '데이터 로딩 중… <span class="spinner"></span>';
+  const [nx, ny, locName] = document.getElementById('preset').value.split(',');
+  const subtitleEl = document.getElementById('subtitle');
+  subtitleEl.innerHTML = `${locName} 데이터를 분석 중… <span class="spinner"></span>`;
   document.getElementById('error-box').style.display = 'none';
 
   try {
-    /*
-     * 어제 실적: 그제(base_date) 2300 발표 → fcstDate=어제 필터
-     *   그제 2300 + 4h = 어제 0300 이후 데이터 포함
-     * 오늘 예보: 어제(base_date) 2300 발표 → fcstDate=오늘 필터
-     *   어제 2300 + 4h = 오늘 0300 이후 데이터 포함
-     */
-    const [itemsY, itemsT] = await Promise.all([
-      fetchKMA(nx, ny, dbYDate, '2300'),
-      fetchKMA(nx, ny, yestDate, '2300'),
+    const yestDate = new Date(); yestDate.setDate(yestDate.getDate() - 1);
+    const todayStr = getKMAFormattedDate(now);
+    const yestStr = getKMAFormattedDate(yestDate);
+
+    // 0200 발표 데이터를 기준으로 00시~23시 예보 추출
+    const [yItems, tItems] = await Promise.all([
+      fetchKMA('getVilageFcst', { base_date: yestStr, base_time: '0200', nx, ny }),
+      fetchKMA('getVilageFcst', { base_date: todayStr, base_time: '0200', nx, ny })
     ]);
 
-    yArr_all = parseItems(itemsY, yestDate);
-    tArr_all = parseItems(itemsT, todayDate);
+    yDataAll = parseItems(yItems, yestStr);
+    tDataAll = parseItems(tItems, todayStr);
 
-    /* 요약 카드 */
-    const yTemps  = yArr_all.temperature.filter(v => v !== null);
-    const tTemps  = tArr_all.temperature.filter(v => v !== null);
-    const yPrecip = yArr_all.precipitation;
-
-    document.getElementById('card-ymax').textContent    = yTemps.length  ? Math.max(...yTemps).toFixed(1)+'°C' : '—';
-    document.getElementById('card-tmax').textContent    = tTemps.length  ? Math.max(...tTemps).toFixed(1)+'°C' : '—';
-    document.getElementById('card-yprecip').textContent = yPrecip.reduce((a,b) => a+b, 0).toFixed(1)+'mm';
-    document.getElementById('card-now').textContent     = String(nowH).padStart(2,'0')+':00';
-
-    const fmtD = d => `${parseInt(d.slice(4,6))}/${parseInt(d.slice(6,8))}`;
-    document.getElementById('subtitle').textContent =
-      `${locName} · 어제(${fmtD(yestDate)}) 단기예보 vs 오늘(${fmtD(todayDate)}) 단기예보`;
+    // 상단 카드 업데이트
+    const validY = yDataAll.temperature.filter(v => v !== null);
+    const validT = tDataAll.temperature.filter(v => v !== null);
+    document.getElementById('card-ymax').textContent = validY.length ? Math.max(...validY).toFixed(1)+'°C' : '—';
+    document.getElementById('card-tmax').textContent = validT.length ? Math.max(...validT).toFixed(1)+'°C' : '—';
+    document.getElementById('card-now').textContent = nowH + ':00';
+    document.getElementById('card-status').textContent = '수신 완료';
+    subtitleEl.textContent = `${locName} 실시간 비교 차트 (${todayStr})`;
 
     buildChart();
   } catch(e) {
-    let msg = '날씨 데이터를 불러오지 못했습니다: ' + e.message;
-    if (e.message.includes('Failed to fetch') || e.message.includes('NetworkError')) {
-      msg += '\n\n⚠️ CORS 오류일 수 있습니다. 기상청 API는 일부 환경에서 직접 호출이 차단됩니다.';
-    }
-    showError(msg);
-    document.getElementById('subtitle').textContent = '데이터 로드 실패';
+    document.getElementById('card-status').textContent = '수신 실패';
+    showError("데이터를 가져오는 중 오류가 발생했습니다. (API 키 혹은 CORS 확인)");
+    console.error(e);
   }
 }
 
-/* ── 현재 시각 수직선 플러그인 ─────────────────── */
-Chart.register({
-  id: 'nowLine',
-  afterDraw(chart) {
-    const xScale = chart.scales.x;
-    if (!xScale) return;
-    const x = xScale.getPixelForValue(nowH);
-    const {top, bottom} = chart.chartArea;
-    const ctx = chart.ctx;
-    const isDark = matchMedia('(prefers-color-scheme: dark)').matches;
-    ctx.save();
-    ctx.strokeStyle = 'rgba(130,130,130,0.6)';
-    ctx.lineWidth   = 1.5;
-    ctx.setLineDash([4, 4]);
-    ctx.beginPath(); ctx.moveTo(x, top); ctx.lineTo(x, bottom); ctx.stroke();
-    ctx.setLineDash([]);
-    ctx.fillStyle = isDark ? 'rgba(255,255,255,0.45)' : 'rgba(0,0,0,0.38)';
-    ctx.font = '11px sans-serif';
-    ctx.fillText('현재', x + 4, top + 14);
-    ctx.restore();
-  }
-});
-
-/* ── 차트 그리기 ─────────────────────────────── */
+/* ── 차트 생성 ─────────────────────────────────── */
 function buildChart() {
-  const mc       = METRICS[currentMetric];
-  const yData    = yArr_all[currentMetric] || [];
-  const tData    = tArr_all[currentMetric] || [];
-  const isPrecip = currentMetric === 'precipitation';
-  const isDark   = matchMedia('(prefers-color-scheme: dark)').matches;
-  const gridC    = isDark ? 'rgba(255,255,255,0.07)' : 'rgba(0,0,0,0.06)';
-  const tickC    = isDark ? 'rgba(255,255,255,0.5)'  : 'rgba(0,0,0,0.45)';
-
-  const datasets = isPrecip ? [
-    { label:'어제 실적', data: yData, type:'bar',
-      backgroundColor:'rgba(50,102,173,0.45)', borderColor:'#3266ad', borderWidth:1, borderRadius:2 },
-    { label:'오늘 예보', data: tData, type:'bar',
-      backgroundColor:'rgba(224,123,57,0.45)',  borderColor:'#e07b39', borderWidth:1, borderRadius:2 },
-  ] : [
-    { label:'어제 실적', data: yData,
-      borderColor:'#3266ad', backgroundColor:'rgba(50,102,173,0.07)',
-      borderWidth:2, pointRadius:2, pointHoverRadius:5, tension:0.3, fill:false,
-      spanGaps: true },
-    { label:'오늘 예보', data: tData,
-      borderColor:'#e07b39', backgroundColor:'rgba(224,123,57,0.07)',
-      borderWidth:2, borderDash:[5,4], pointRadius:2, pointHoverRadius:5, tension:0.3, fill:false,
-      spanGaps: true },
-  ];
-
   if (chart) chart.destroy();
-  chart = new Chart(document.getElementById('weatherChart'), {
+  const ctx = document.getElementById('weatherChart').getContext('2d');
+  const metric = METRICS[currentMetric];
+  
+  const yData = yDataAll[currentMetric];
+  const tFull = tDataAll[currentMetric];
+  
+  // 오늘 데이터를 현재 시각(nowH) 기준으로 실선/점선 분리
+  const tPast = tFull.map((v, i) => i <= nowH ? v : null);
+  const tFuture = tFull.map((v, i) => i >= nowH ? v : null);
+
+  const isPrecip = currentMetric === 'precipitation';
+
+  chart = new Chart(ctx, {
     type: isPrecip ? 'bar' : 'line',
-    data: { labels: LABELS, datasets },
+    data: {
+      labels: LABELS,
+      datasets: [
+        {
+          label: '어제 실측',
+          data: yData,
+          borderColor: '#3266ad',
+          backgroundColor: isPrecip ? 'rgba(50,102,173,0.3)' : 'transparent',
+          borderWidth: 1.5,
+          pointRadius: 0,
+          tension: 0.3,
+          fill: isPrecip
+        },
+        {
+          label: '오늘 실측',
+          data: tPast,
+          borderColor: '#e07b39',
+          backgroundColor: isPrecip ? 'rgba(224,123,57,0.5)' : 'transparent',
+          borderWidth: 3, // 지나간 시간은 굵게 표시
+          pointRadius: 2,
+          tension: 0.3,
+          fill: isPrecip
+        },
+        {
+          label: '오늘 예보',
+          data: tFuture,
+          borderColor: '#e07b39',
+          backgroundColor: 'transparent',
+          borderWidth: 2,
+          borderDash: [5, 5], // 남은 시간은 점선
+          pointRadius: 0,
+          tension: 0.3,
+          fill: false
+        }
+      ]
+    },
     options: {
       responsive: true,
       maintainAspectRatio: false,
-      interaction: { mode:'index', intersect:false },
+      interaction: { mode: 'index', intersect: false },
       plugins: {
         legend: { display: false },
         tooltip: {
           callbacks: {
-            title: ctx => ctx[0].label + ' 기준',
-            label: ctx => ` ${ctx.dataset.label}: ${
-              ctx.parsed.y !== null ? ctx.parsed.y.toFixed(1) + mc.unit : '데이터 없음'
-            }`
+            label: (ctx) => ` ${ctx.dataset.label}: ${ctx.parsed.y !== null ? ctx.parsed.y.toFixed(1) + metric.unit : '데이터 없음'}`
           }
         }
       },
       scales: {
-        x: {
-          grid: { color: gridC },
-          ticks: { color: tickC, font:{size:11}, maxRotation:0, autoSkip:true, maxTicksLimit:13 }
-        },
-        y: {
-          grid: { color: gridC },
-          ticks: { color: tickC, font:{size:11}, callback: v => v.toFixed(0) + mc.unit },
-          title: { display:true, text: mc.yLabel, color: tickC, font:{size:11} }
+        x: { grid: { display: false } },
+        y: { 
+          beginAtZero: false,
+          title: { display: true, text: metric.yLabel, font: { size: 11 } }
         }
       }
     }
@@ -411,21 +262,18 @@ function buildChart() {
 
 function setMetric(m) {
   currentMetric = m;
-  Object.keys(METRICS).forEach(k =>
-    document.getElementById('btn-' + k).classList.toggle('active', k === m)
-  );
-  if (Object.keys(yArr_all).length) buildChart();
+  document.querySelectorAll('.btn-group .btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('btn-' + m).classList.add('active');
+  if (Object.keys(yDataAll).length) buildChart();
 }
 
 function showError(msg) {
-  const el = document.getElementById('error-box');
-  el.style.whiteSpace = 'pre-wrap';
-  el.textContent = msg;
-  el.style.display = 'block';
+  const box = document.getElementById('error-box');
+  box.textContent = msg;
+  box.style.display = 'block';
 }
 
-/* ── 초기 실행 ───────────────────────────────── */
-document.getElementById('card-now').textContent = String(nowH).padStart(2,'0') + ':00';
+/* ── 초기 실행 ─────────────────────────────────── */
 load();
 </script>
 </body>
